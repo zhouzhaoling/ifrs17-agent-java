@@ -20,4 +20,9 @@ public class Ifrs17AgentState extends AgentState {
     public String rules() { return (String) value("rules").orElse(""); }
 
     public String details() { return (String) value("details").orElse(""); }
+
+    // 新增：读取长对话历史记忆
+    public String history() {
+        return (String) value("history").orElse("");
+    }
 }
