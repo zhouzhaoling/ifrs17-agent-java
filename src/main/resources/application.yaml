@@ -1,0 +1,11 @@
+spring:
+  ai:
+    ollama:
+      base-url: http://localhost:11434
+      chat:
+        options:
+          model: qwen2.5:7b
+          temperature: 0.7
+      embedding:
+        options:
+          model: nomic-embed-text # 👈 新增这一行，指定向量模型
