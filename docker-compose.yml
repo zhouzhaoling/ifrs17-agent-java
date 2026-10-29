@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  # 1. Redis 服务
+  redis-server:
+    image: redis:latest
+    container_name: ifrs17-redis
+    command: redis-server --requirepass 123456
+    ports:
+      - "6379:6379"
+    networks:
+      - agent-network
+
+  # 2. 你的 Spring Boot 应用
+  ifrs17-agent-java:
+    build: .  # 使用当前目录下的 Dockerfile 构建镜像
+    container_name: ifrs17-agent-app
+    ports:
+      - "8080:8080"
+    depends_on:
+      - redis-server  # 确保 Redis 先启动
+    environment:
+      # 如果你配置了环境变量可以在这里传入
+      - SPRING_PROFILES_ACTIVE=docker
+    # 关键：让容器能访问你宿主机上的 Ollama
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - agent-network
+
+networks:
+  agent-network:
+    driver: bridge
