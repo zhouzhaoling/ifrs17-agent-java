@@ -1,16 +1,22 @@
 package com.zhongan.ifrs17agentjava.controller;
 
 import com.zhongan.ifrs17agentjava.state.Ifrs17AgentState;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.bsc.langgraph4j.CompiledGraph;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
+import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
 @RestController
@@ -21,6 +27,8 @@ public class AgentController {
     private final CompiledGraph<Ifrs17AgentState> simpleChatGraph;
     private final StringRedisTemplate redisTemplate;
     private final RedissonClient redissonClient;
+    // 注入 ChatClient.Builder
+    private final ChatClient.Builder chatClientBuilder;
 
     @GetMapping("/chat")
     public String chat(
@@ -106,5 +114,40 @@ public class AgentController {
         } finally {
             if (submitLock.isLocked() && submitLock.isHeldByCurrentThread()) submitLock.unlock();
         }
+    }
+
+    @GetMapping(value = "/chat/stream", produces = "text/event-stream;charset=UTF-8")
+    public SseEmitter streamChat(@RequestParam String question, HttpServletResponse response) {
+        // 1. 强制设置响应编码为 UTF-8
+        response.setCharacterEncoding("UTF-8");
+        response.setContentType("text/event-stream;charset=UTF-8");
+
+        SseEmitter emitter = new SseEmitter(180000L);
+
+        CompletableFuture.runAsync(() -> {
+            try {
+                ChatClient chatClient = chatClientBuilder.build();
+
+                chatClient.prompt()
+                        .user(question)
+                        .stream()
+                        .content()
+                        .doOnNext(chunk -> {
+                            try {
+                                // 2. 确保 chunk 是正常的字符串（如果 Spring AI 底层截断了字节，这里可能需要转码）
+                                emitter.send(chunk);
+                            } catch (IOException e) {
+                                emitter.completeWithError(e);
+                            }
+                        })
+                        .doOnComplete(emitter::complete)
+                        .doOnError(emitter::completeWithError)
+                        .subscribe();
+            } catch (Exception e) {
+                emitter.completeWithError(e);
+            }
+        });
+
+        return emitter;
     }
 }
