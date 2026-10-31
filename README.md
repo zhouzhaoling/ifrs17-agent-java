@@ -1,35 +1,49 @@
 # IFRS17 智能财务分析与运营 Agent 平台 (Java版)
 
 ## 📖 项目背景
-本项目是一个基于 Spring Boot 3.4 + Spring AI + LangGraph4j 构建的企业级单 Agent 后端原型。旨在验证将大模型能力（意图识别、工具调用、状态机编排、RAG 检索）接入传统财务核算（IFRS17）场景的可行性。用于个人架构验证与技术演示。
+本项目是一个基于 Spring Boot 3.4 + Spring AI + LangGraph4j 构建的企业级多智能体（Multi-Agent）后端原型。旨在验证将大模型能力（意图识别、工具调用、状态机编排、RAG 检索、语义层防幻觉）接入传统财务核算（IFRS17）场景的可行性，具备高并发、高可用与强安全隔离特性。
 
 ## 🛠️ 技术栈
 - **后端框架**: Spring Boot 3.4.x, Java 21
 - **AI 框架**: Spring AI 1.1.x
 - **Agent 编排**: LangGraph4j 1.8.x
 - **大模型服务**: Ollama 本地私有化部署 (Qwen2.5-7B / nomic-embed-text)
-- **接口协议**: RESTful API (HTTP)
+- **数据与中间件**: Redis, H2/MySQL, Redisson, MyBatis
+- **部署交付**: Docker, Docker Compose
 
 ## 🏗️ 核心架构设计
-1. **状态机编排 (LangGraph)**: 将大模型调用封装为 Node 节点，定义全局 State，告别简单的 API 直调。
-2. **意图路由 (Router)**: 通过强约束的 Prompt，实现 DIFF（差异分析）和 KNOWLEDGE（知识问答）的智能分发。
-3. **工具调用 (Tool Calling)**: 基于 `@Tool` 注解，将底层 IFRS17 查库逻辑封装为原子工具。大模型隐式判断后，自动提取参数查库。
-4. **检索增强生成 (RAG)**: 挂载 `QuestionAnswerAdvisor`，将企业内部规则和 UAT 文档进行向量化检索，有效抑制大模型幻觉。
+1. **复合技能路由 (Multi-Skill Router)**: 通过强约束的 Prompt，将用户意图精准分发至 `DIFF`（差异分析）、`KNOWLEDGE`（知识检索）、`METRIC`（指标查询）、`REPORT`（报告生成）四大独立分支。
+2. **多源证据并发与 Reducer**: 在差异分析节点中，使用 `CompletableFuture` 多线程并发查库与查规则；利用 LangGraph 的 `Channel.appender` 实现全局 State 的安全合并，杜绝并发覆盖。
+3. **语义层与指标防幻觉**: 大模型不直接生成物理表 SQL。通过语义层字典表与 `@Tool` 工具调用，将业务公式、来源表固化，确保口径唯一。
+4. **企业级数据权限隔离**: 在 MCP 网关层自研 MyBatis `DataScopeInterceptor`，根据当前用户上下文自动拦截并拼接行级数据权限（`AND org_code = 'xxx'`），防止越权查询。
+5. **检索增强生成 (RAG)**: 挂载 `QuestionAnswerAdvisor`，结合本地向量库，将企业规则和 UAT 文档向量化召回，配合引用来源抑制幻觉。
+6. **高可用防护**: 基于 Redis 实现五层防护（INCR 限流、Redisson 防重、结果缓存、双检锁、Hash 状态存储），并集成 SSE 流式输出与全局异常降级。
 
 ## 🚀 快速启动
 1. 本地安装 Ollama 并拉取模型: `ollama run qwen2.5:7b` 和 `ollama pull nomic-embed-text`
 2. 启动 Spring Boot 应用。
-3. 访问测试接口: 
-   `GET http://localhost:8080/api/agent/chat?question=帮我查一下上海机构准备金的账套差异`
+3. 访问前端测试页面：`http://localhost:8080/index.html`
 
-## 📝 演进规划 (TODO)
-- [ ] 引入 Checkpointer 将 State 存入 Redis，支持分布式断点续跑。
-- [ ] 接入 MCP (Model Context Protocol) 网关，将本地 Tool 升级为远程微服务。
-- [ ] 实现 SSE 流式输出，防止网关超时。
+## 🎬 核心场景演示 (Demo)
 
+### 1. 差异分析 (DIFF) - 多线程并发与状态合并
+> **请求**: `GET /api/agent/chat?question=帮我查一下上海机构准备金为什么对不上`
+> **表现**: 系统并发查询明细与规则，收集完整证据链后，交由大模型输出结构化的归因报告。
 
-## 🐳 快速部署 (Docker 一键启动)
-本项目已实现全容器化部署。无需配置本地 Maven 环境，只需在宿主机开启 Ollama，执行以下命令即可一键拉起 Spring Boot 应用与 Redis 服务：
+### 2. 指标查询 (METRIC) - 语义层防幻觉
+> **请求**: `GET /api/agent/chat?question=准备金余额的计算公式是什么？`
+> **表现**: 系统路由至语义层，调用专属工具获取口径（公式与默认过滤条件），避免模型胡编乱造。
+
+### 3. 知识问答 (KNOWLEDGE) - RAG 召回
+> **请求**: `GET /api/agent/chat?question=UAT报错E1001是什么原因？`
+> **表现**: 通过向量检索从本地知识库召回报错原因与解决方案，并结合出处生成回答。
+
+### 4. 报告生成 (REPORT) - 复合 Skill 与前端渲染
+> **请求**: `GET /api/agent/chat?question=帮我生成一份2025年1月上海机构的准备金核算分析报告`
+> **表现**: 强约束 Prompt 生成四大模块报告，支持落盘保存，前端页面（`index.html`）渲染为精美的 Markdown 报表。
+
+## 🐳 一键部署 (Docker)
+本项目已实现全链路容器化，无需配置本地 Maven，一键拉起应用与 Redis 服务：
 
 ```bash
 # 1. 本地打包 (需具备 Maven 和 JDK 21)
@@ -37,3 +51,10 @@ mvn clean package -DskipTests
 
 # 2. 一键启动容器
 docker-compose up -d --build
+```
+
+## 📝 演进规划 (TODO)
+- [ ] 引入 LangGraph Checkpointer 将 State 存入 Redis，实现真正的分布式断点续跑。
+- [ ] 将本地 Tool 升级为独立部署的远程 MCP Server 集群。
+- [ ] 实现 Word/PDF 格式的正式报告导出功能。
+- [ ] 接入 Rerank 重排序模型，提升 RAG 召回精准度。
