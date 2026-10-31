@@ -26,3 +26,14 @@
 - [ ] 引入 Checkpointer 将 State 存入 Redis，支持分布式断点续跑。
 - [ ] 接入 MCP (Model Context Protocol) 网关，将本地 Tool 升级为远程微服务。
 - [ ] 实现 SSE 流式输出，防止网关超时。
+
+
+## 🐳 快速部署 (Docker 一键启动)
+本项目已实现全容器化部署。无需配置本地 Maven 环境，只需在宿主机开启 Ollama，执行以下命令即可一键拉起 Spring Boot 应用与 Redis 服务：
+
+```bash
+# 1. 本地打包 (需具备 Maven 和 JDK 21)
+mvn clean package -DskipTests
+
+# 2. 一键启动容器
+docker-compose up -d --build
