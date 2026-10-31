@@ -1,9 +1,6 @@
 package com.zhongan.ifrs17agentjava.graph;
 
-import com.zhongan.ifrs17agentjava.node.DiffAnalysisNode;
-import com.zhongan.ifrs17agentjava.node.LlmChatNode;
-import com.zhongan.ifrs17agentjava.node.RagQueryNode;
-import com.zhongan.ifrs17agentjava.node.RouterNode;
+import com.zhongan.ifrs17agentjava.node.*;
 import com.zhongan.ifrs17agentjava.state.Ifrs17AgentState;
 import lombok.RequiredArgsConstructor;
 import org.bsc.langgraph4j.CompiledGraph;
@@ -26,32 +23,36 @@ public class AgentGraphConfig {
     private final LlmChatNode llmChatNode;
     private final DiffAnalysisNode diffAnalysisNode;
     private final RagQueryNode ragQueryNode;
+    private final MetricQueryNode metricQueryNode; // 👈 第二战役新增的语义层节点
 
     @Bean
     public CompiledGraph<Ifrs17AgentState> simpleChatGraph() throws Exception {
-        // 👇 这里显式加上泛型 <Ifrs17AgentState> 解决编译报错
         return new StateGraph<Ifrs17AgentState>(Ifrs17AgentState.SCHEMA, Ifrs17AgentState::new)
+                // 注册所有节点
                 .addNode("router", node_async(routerNode))
                 .addNode("chat", node_async(llmChatNode))
                 .addNode("diff_analysis", node_async(diffAnalysisNode))
                 .addNode("rag_query", node_async(ragQueryNode))
+                .addNode("metric_query", node_async(metricQueryNode))
 
                 .addEdge(START, "router")
 
+                // 👇 条件路由（完美映射四大意图）
                 .addConditionalEdges(
                         "router",
-                        edge_async(state -> state.intent()),
+                        edge_async(Ifrs17AgentState::intent),
                         Map.of(
                                 "CHAT", "chat",
                                 "DIFF", "diff_analysis",
-                                "KNOWLEDGE", "rag_query"
+                                "KNOWLEDGE", "rag_query",
+                                "METRIC", "metric_query"
                         )
                 )
 
-                // 👇 核心修复：差异分析并发查完证据后，必须走向 chat 汇总，再结束！
-                .addEdge("diff_analysis", "chat")
-                // 👇 RAG 查完直接结束（或者如果要汇总，也可以指向 "chat"）
-                .addEdge("rag_query", END)
+                // 👇 汇总与结束边
+                .addEdge("diff_analysis", "chat") // 差异分析收集完证据，走向大模型汇总
+                .addEdge("rag_query", END)        // RAG 查询完直接返回
+                .addEdge("metric_query", END)     // 语义层查询完直接返回
                 .addEdge("chat", END)
 
                 .compile();
