@@ -41,3 +41,5 @@ build/
 # 系统级垃圾文件
 .DS_Store
 Thumbs.db
+
+IFRS17_分析报告_*.md
