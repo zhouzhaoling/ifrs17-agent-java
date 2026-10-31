@@ -1,12 +1,13 @@
 package com.zhongan.ifrs17agentjava.node;
 
 import com.zhongan.ifrs17agentjava.state.Ifrs17AgentState;
-import com.zhongan.ifrs17agentjava.tool.Ifrs17QueryTool; // 引入刚才写的工具
+import com.zhongan.ifrs17agentjava.tool.Ifrs17QueryTool;
 import lombok.RequiredArgsConstructor;
 import org.bsc.langgraph4j.action.NodeAction;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.Map;
 
 @Component
@@ -14,26 +15,44 @@ import java.util.Map;
 public class LlmChatNode implements NodeAction<Ifrs17AgentState> {
 
     private final ChatClient.Builder chatClientBuilder;
-    private final Ifrs17QueryTool ifrs17QueryTool; // 注入工具类
+    private final Ifrs17QueryTool ifrs17QueryTool;
 
     @Override
     public Map<String, Object> apply(Ifrs17AgentState state) {
-        System.out.println(">>> [Agent节点执行] 正在思考是否需要调用工具...");
+        System.out.println(">>> [汇总分析节点] 正在整合多源证据并调用大模型...");
 
-        // 1. 👈 关键：从 State 里拿到 Redis 传过来的历史记录
-        String history = state.history();
+        // 1. 获取并发收集到的证据列表
+        List<String> evidenceList = state.evidenceList();
 
-        // 2. 👈 关键：把历史记录拼进 System Prompt 里
-        String systemPrompt = "你是一个 IFRS17 财务核算专家。你可以使用提供的工具来查询数据。如果需要查数据，请直接调用工具。\n" +
-                "以下是你和用户之前的对话历史：\n" + history;
+        // 2. 把 List 拼接成优美的字符串格式
+        StringBuilder contextBuilder = new StringBuilder();
+        if (evidenceList == null || evidenceList.isEmpty()) {
+            contextBuilder.append("暂无底层明细和规则数据。");
+        } else {
+            for (int i = 0; i < evidenceList.size(); i++) {
+                contextBuilder.append(i + 1).append(". ").append(evidenceList.get(i)).append("\n");
+            }
+        }
+        String context = contextBuilder.toString();
 
+        // 3. 组装专业的 Prompt（结合系统角色、证据列表、用户问题）
+        String systemPrompt = "你是一个资深的 IFRS17 财务核算专家。你的任务是根据系统提供的【底层收集到的证据】，对用户的财务问题给出专业的归因分析。";
+
+        String userPrompt = String.format(
+                "【用户问题】\n%s\n\n【底层收集到的证据】\n%s\n\n请结合上述证据，给出结构化的差异分析和处理建议。",
+                state.question(), context
+        );
+
+        System.out.println(">>> [发送给大模型的 Prompt]: \n" + userPrompt);
+
+        // 4. 调用大模型生成最终答案
         String answer = chatClientBuilder.build().prompt()
-                .system(systemPrompt) // 使用拼装后的 Prompt
-                .user(state.question())
-                .tools(ifrs17QueryTool)
+                .system(systemPrompt)
+                .user(userPrompt)
                 .call()
                 .content();
 
+        // 5. 将大模型的最终输出写回 State
         return Map.of("answer", answer);
     }
 }

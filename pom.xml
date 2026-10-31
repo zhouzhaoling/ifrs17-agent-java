@@ -74,6 +74,13 @@
             <artifactId>spring-ai-vector-store</artifactId>
         </dependency>
 
+        <!-- 引入 MyBatis 框架（为了演示底层 SQL 拦截器） -->
+        <dependency>
+            <groupId>org.mybatis.spring.boot</groupId>
+            <artifactId>mybatis-spring-boot-starter</artifactId>
+            <version>3.0.3</version> <!-- 适配 Spring Boot 3.x 的版本 -->
+        </dependency>
+
         <!-- Spring Data JPA 与 H2 内存数据库 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

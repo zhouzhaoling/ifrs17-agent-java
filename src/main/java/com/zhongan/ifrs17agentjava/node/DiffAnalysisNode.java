@@ -1,30 +1,51 @@
 package com.zhongan.ifrs17agentjava.node;
 
 import com.zhongan.ifrs17agentjava.state.Ifrs17AgentState;
-import com.zhongan.ifrs17agentjava.tool.Ifrs17QueryTool;
-import lombok.RequiredArgsConstructor;
 import org.bsc.langgraph4j.action.NodeAction;
-import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 @Component
-@RequiredArgsConstructor
 public class DiffAnalysisNode implements NodeAction<Ifrs17AgentState> {
-    private final ChatClient.Builder chatClientBuilder;
-    private final Ifrs17QueryTool tool;
+
+    private final ExecutorService executor = Executors.newFixedThreadPool(2);
 
     @Override
     public Map<String, Object> apply(Ifrs17AgentState state) {
-        System.out.println(">>> [差异分析节点] 启动多步排查流程...");
+        System.out.println(">>> [差异分析节点] 启动多线程并发收集证据...");
 
-        String answer = chatClientBuilder.build().prompt()
-                .system("你是一个财务差异排查专家。请先调用工具查询规则，再调用工具查询明细，最后按【差异金额、原因归因、修复建议】生成报告。")
-                .user(state.question())
-                .tools(tool) // 把武器库交给这个节点
-                .call().content();
+        // 并发任务 1：查明细库
+        CompletableFuture<String> detailFuture = CompletableFuture.supplyAsync(() -> {
+            try { Thread.sleep(1000); } catch (InterruptedException e) {}
+            return "数据库结果：上海机构准备金旧账套 1000 万，新账套 1250 万。";
+        }, executor);
 
-        return Map.of("answer", answer);
+        // 并发任务 2：查规则库
+        CompletableFuture<String> ruleFuture = CompletableFuture.supplyAsync(() -> {
+            try { Thread.sleep(1000); } catch (InterruptedException e) {}
+            return "规则库结果：IFRS17规定，准备金折现率必须使用即期利率曲线。";
+        }, executor);
+
+        // 等待两个任务都完成
+        CompletableFuture.allOf(detailFuture, ruleFuture).join();
+
+        List<String> evidence = new ArrayList<>();
+        try {
+            evidence.add(detailFuture.get());
+            evidence.add(ruleFuture.get());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        System.out.println(">>> [差异分析节点] 证据收集完毕，共 " + evidence.size() + " 条");
+
+        // 返回列表，LangGraph4j 会根据 SCHEMA 中的 appender 自动合并
+        return Map.of("evidence_list", evidence);
     }
 }

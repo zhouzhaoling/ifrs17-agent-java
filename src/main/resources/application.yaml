@@ -1,21 +1,15 @@
 spring:
   ai:
     ollama:
-      # 改成宿主机地址，Windows/Mac 专属
-      base-url: http://host.docker.internal:11434
+      base-url: http://localhost:11434 # 👈 改回本地
       chat:
         options:
           model: qwen2.5:7b
-          temperature: 0.7
-      embedding:
-        options:
-          model: nomic-embed-text
   data:
     redis:
-      # 改成 docker-compose 里的 Redis 服务名
-      host: ifrs17-redis
+      host: localhost # 👈 改回本地
       port: 6379
       password: 123456
   web:
     resources:
-      add-mappings: false # 关掉 favicon.ico 的报错
+      add-mappings: false

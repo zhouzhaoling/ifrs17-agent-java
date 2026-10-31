@@ -1,0 +1,12 @@
+spring:
+  ai:
+    ollama:
+      base-url: http://host.docker.internal:11434
+      chat:
+        options:
+          model: qwen2.5:7b
+  data:
+    redis:
+      host: redis-server
+      port: 6379
+      password: 123456
