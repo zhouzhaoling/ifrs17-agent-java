@@ -10,6 +10,6 @@ spring:
       host: localhost # 👈 改回本地
       port: 6379
       password: 123456
-  web:
-    resources:
-      add-mappings: false
+#  web:
+#    resources:
+#      add-mappings: false

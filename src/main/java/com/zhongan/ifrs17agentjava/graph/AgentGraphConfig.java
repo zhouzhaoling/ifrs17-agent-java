@@ -24,6 +24,7 @@ public class AgentGraphConfig {
     private final DiffAnalysisNode diffAnalysisNode;
     private final RagQueryNode ragQueryNode;
     private final MetricQueryNode metricQueryNode; // 👈 第二战役新增的语义层节点
+    private final ReportGenerationNode reportGenerationNode;
 
     @Bean
     public CompiledGraph<Ifrs17AgentState> simpleChatGraph() throws Exception {
@@ -34,10 +35,11 @@ public class AgentGraphConfig {
                 .addNode("diff_analysis", node_async(diffAnalysisNode))
                 .addNode("rag_query", node_async(ragQueryNode))
                 .addNode("metric_query", node_async(metricQueryNode))
+                .addNode("report_generation", node_async(reportGenerationNode))
 
                 .addEdge(START, "router")
 
-                // 👇 条件路由（完美映射四大意图）
+                // 👇 条件路由（完美映射五大意图）
                 .addConditionalEdges(
                         "router",
                         edge_async(Ifrs17AgentState::intent),
@@ -45,7 +47,8 @@ public class AgentGraphConfig {
                                 "CHAT", "chat",
                                 "DIFF", "diff_analysis",
                                 "KNOWLEDGE", "rag_query",
-                                "METRIC", "metric_query"
+                                "METRIC", "metric_query",
+                                "REPORT", "report_generation" // 👈 新增路由
                         )
                 )
 
@@ -53,6 +56,7 @@ public class AgentGraphConfig {
                 .addEdge("diff_analysis", "chat") // 差异分析收集完证据，走向大模型汇总
                 .addEdge("rag_query", END)        // RAG 查询完直接返回
                 .addEdge("metric_query", END)     // 语义层查询完直接返回
+                .addEdge("report_generation", END) // 👈 生成完报告直接结束
                 .addEdge("chat", END)
 
                 .compile();

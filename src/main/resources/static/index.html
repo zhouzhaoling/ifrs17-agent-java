@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>IFRS17 财务分析报告</title>
+    <!-- 👇 引入 marked.js，专门用来把 Markdown 转成漂亮的 HTML -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        body { font-family: 'Microsoft YaHei', sans-serif; padding: 20px; background: #f4f7f6; }
+        .container { max-width: 900px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .input-area { display: flex; gap: 10px; margin-bottom: 20px; }
+        input { flex: 1; padding: 12px; border: 1px solid #ccc; border-radius: 4px; font-size: 16px; }
+        button { padding: 12px 24px; background: #007bff; color: white; border: none; border-radius: 4px; font-size: 16px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        /* Markdown 渲染后的表格样式 */
+        table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h2>🤖 IFRS17 智能财务分析 Agent</h2>
+    <div class="input-area">
+        <input type="text" id="question" value="帮我生成一份2025年1月上海机构的准备金核算分析报告">
+        <button onclick="askAgent()">生成报告</button>
+    </div>
+    <!-- 报告渲染区域 -->
+    <div id="report-content" style="line-height: 1.6; color: #333;"></div>
+</div>
+
+<script>
+    async function askAgent() {
+        const question = document.getElementById('question').value;
+        const contentDiv = document.getElementById('report-content');
+        contentDiv.innerHTML = "<p>⏳ Agent 正在查阅数据并撰写报告，请稍候...</p>";
+
+        try {
+            // 请求你刚刚写好的 Java 接口
+            const response = await fetch(`/api/agent/chat?question=${encodeURIComponent(question)}`);
+            const markdownText = await response.text(); // 获取纯文本
+
+            // 👇 核心魔法：用 marked 把 Markdown 文本转换成漂亮的 HTML 标签
+            contentDiv.innerHTML = marked.parse(markdownText);
+        } catch (error) {
+            contentDiv.innerHTML = `<p style="color:red;">请求失败: ${error}</p>`;
+        }
+    }
+</script>
+</body>
+</html>
