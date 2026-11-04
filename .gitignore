@@ -43,3 +43,11 @@ build/
 Thumbs.db
 
 IFRS17_分析报告_*.md
+
+# 忽略生成的报表目录
+downloads/
+
+# 忽略生成的临时报告和测试文件
+IFRS17_*.md
+*.xlsx
+*.pdf

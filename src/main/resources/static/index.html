@@ -14,7 +14,6 @@
         ::-webkit-scrollbar-track { background: #f1f1f1; }
         ::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 3px; }
         ::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
-
         /* Markdown 渲染后的表格样式优化 */
         .markdown-body table { border-collapse: collapse; width: 100%; margin: 15px 0; }
         .markdown-body th, .markdown-body td { border: 1px solid #e5e7eb; padding: 10px; text-align: left; font-size: 14px; }
@@ -35,9 +34,12 @@
         </h1>
         <p class="text-xs text-gray-400 mt-1">Java + Spring AI 架构</p>
     </div>
+
+    <!-- 侧边栏内容区 -->
     <div class="p-4 flex-1 overflow-y-auto">
+        <!-- 技能快捷指令 -->
         <p class="text-xs font-semibold text-gray-400 mb-3 uppercase tracking-wider">技能快捷指令</p>
-        <div class="space-y-2">
+        <div class="space-y-2 mb-8">
             <button onclick="fillQuestion('帮我查一下上海机构准备金为什么对不上')" class="w-full text-left px-3 py-2 rounded-lg hover:bg-blue-50 text-sm text-gray-700 hover:text-blue-600 transition-colors flex items-center gap-2">
                 <span class="w-2 h-2 rounded-full bg-red-400"></span> 差异排查 (DIFF)
             </button>
@@ -51,7 +53,17 @@
                 <span class="w-2 h-2 rounded-full bg-purple-500"></span> 报告生成 (REPORT)
             </button>
         </div>
+
+        <!-- 知识库管理 (上传区) -->
+        <p class="text-xs font-semibold text-gray-400 mb-3 uppercase tracking-wider">知识库管理</p>
+        <div class="bg-gray-50 p-3 rounded-lg border border-gray-200">
+            <input type="file" id="pdf-upload" accept=".pdf" class="block w-full text-xs text-gray-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 mb-2"/>
+            <button onclick="uploadPDF()" id="upload-btn" class="w-full bg-blue-100 text-blue-700 font-medium text-xs py-2 rounded hover:bg-blue-200 transition-colors">
+                上传并解析入库
+            </button>
+        </div>
     </div>
+
     <div class="p-4 border-t border-gray-100">
         <div class="text-xs text-gray-400 text-center">© 2025 IFRS17 AI Architect</div>
     </div>
@@ -61,7 +73,6 @@
 <div class="flex-1 flex flex-col h-full relative">
     <!-- 聊天记录区 -->
     <div id="chat-container" class="flex-1 overflow-y-auto p-8 space-y-6">
-        <!-- 默认欢迎语 -->
         <div class="flex gap-4">
             <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white flex-shrink-0">AI</div>
             <div class="bg-white p-4 rounded-2xl rounded-tl-none shadow-sm text-sm max-w-3xl border border-gray-100">
@@ -102,67 +113,54 @@
         const messageDiv = document.createElement('div');
         messageDiv.className = `flex gap-4 ${isUser ? 'flex-row-reverse' : ''}`;
 
-        // 头像
         const avatarHtml = isUser
             ? `<div class="w-8 h-8 rounded-full bg-gray-800 flex items-center justify-center text-white text-xs flex-shrink-0">我</div>`
             : `<div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white flex-shrink-0">AI</div>`;
 
-        // 气泡内容
         const bubbleHtml = `
-                <div class="p-4 rounded-2xl shadow-sm max-w-3xl text-sm border ${isUser ? 'bg-blue-50 border-blue-100 rounded-tr-none text-gray-800' : 'bg-white border-gray-100 rounded-tl-none markdown-body'}">
-                    ${isUser ? content : content}
-                </div>
-            `;
+                    <div class="p-4 rounded-2xl shadow-sm max-w-3xl text-sm border ${isUser ? 'bg-blue-50 border-blue-100 rounded-tr-none text-gray-800' : 'bg-white border-gray-100 rounded-tl-none markdown-body'}">
+                        ${isUser ? content : content}
+                    </div>
+                `;
 
         messageDiv.innerHTML = avatarHtml + bubbleHtml;
         container.appendChild(messageDiv);
-
-        // 自动滚动到底部
         container.scrollTop = container.scrollHeight;
-
-        return bubbleHtml; // 返回 DOM 以便后续更新内容
+        return bubbleHtml;
     }
 
-    // 核心请求逻辑
+    // 核心请求逻辑 (普通同步请求)
     async function askAgent() {
         const input = document.getElementById('question-input');
         const question = input.value.trim();
         if (!question) return;
 
-        // 1. 显示用户提问
         appendMessage('user', question);
         input.value = '';
 
-        // 2. 显示 AI 加载中
         const loadingId = 'loading-' + Date.now();
         const loadingHtml = `
-                <div class="flex gap-4" id="${loadingId}">
-                    <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white flex-shrink-0">AI</div>
-                    <div class="bg-white p-4 rounded-2xl rounded-tl-none shadow-sm text-sm border border-gray-100 flex items-center gap-2 text-gray-500">
-                        <svg class="animate-spin h-4 w-4 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                        Agent 正在思考并调度工具，请稍候...
+                    <div class="flex gap-4" id="${loadingId}">
+                        <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white flex-shrink-0">AI</div>
+                        <div class="bg-white p-4 rounded-2xl rounded-tl-none shadow-sm text-sm border border-gray-100 flex items-center gap-2 text-gray-500">
+                            <svg class="animate-spin h-4 w-4 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                            Agent 正在思考并调度工具，请稍候...
+                        </div>
                     </div>
-                </div>
-            `;
+                `;
         document.getElementById('chat-container').insertAdjacentHTML('beforeend', loadingHtml);
         document.getElementById('chat-container').scrollTop = document.getElementById('chat-container').scrollHeight;
 
-        // 禁用发送按钮
         const btn = document.getElementById('send-btn');
         btn.disabled = true;
         btn.classList.add('opacity-50', 'cursor-not-allowed');
 
         try {
-            // 3. 发送请求给 Java 后端
             const response = await fetch(`/api/agent/chat?question=${encodeURIComponent(question)}`);
             if (!response.ok) throw new Error("网络请求失败");
-
             const text = await response.text();
 
-            // 移除加载状态
             document.getElementById(loadingId).remove();
-
-            // 4. 渲染 AI 返回的 Markdown 结果
             const htmlContent = marked.parse(text);
             appendMessage('ai', htmlContent);
 
@@ -170,9 +168,45 @@
             document.getElementById(loadingId).remove();
             appendMessage('ai', `<span class="text-red-500">请求出错：${error.message}，请检查后端服务或大模型是否正常启动。</span>`);
         } finally {
-            // 恢复发送按钮
             btn.disabled = false;
             btn.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
+    }
+
+    // 新增：上传 PDF 逻辑
+    async function uploadPDF() {
+        const fileInput = document.getElementById('pdf-upload');
+        const btn = document.getElementById('upload-btn');
+
+        if (fileInput.files.length === 0) {
+            return alert("请先选择一个 PDF 文件！");
+        }
+
+        const formData = new FormData();
+        formData.append("file", fileInput.files[0]);
+
+        const originalText = btn.innerHTML;
+        btn.innerHTML = "解析入库中...";
+        btn.disabled = true;
+        btn.classList.add('opacity-50');
+
+        try {
+            const response = await fetch('/api/agent/upload', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) throw new Error("网络请求失败");
+            const data = await response.json();
+
+            appendMessage('ai', `<span class="text-blue-600 font-bold">✅ 系统提示：</span> ${data.message}`);
+            fileInput.value = "";
+        } catch (error) {
+            appendMessage('ai', `<span class="text-red-500">上传失败：${error.message}</span>`);
+        } finally {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+            btn.classList.remove('opacity-50');
         }
     }
 </script>

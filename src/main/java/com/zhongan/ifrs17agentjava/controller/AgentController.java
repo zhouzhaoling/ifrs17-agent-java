@@ -1,5 +1,6 @@
 package com.zhongan.ifrs17agentjava.controller;
 
+import com.zhongan.ifrs17agentjava.service.DocumentService;
 import com.zhongan.ifrs17agentjava.state.Ifrs17AgentState;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -7,12 +8,16 @@ import org.bsc.langgraph4j.CompiledGraph;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -29,6 +34,34 @@ public class AgentController {
     private final RedissonClient redissonClient;
     // 注入 ChatClient.Builder
     private final ChatClient.Builder chatClientBuilder;
+
+
+    private final DocumentService documentService;
+
+    // 接口1：上传 PDF 解析入库
+    @PostMapping("/upload")
+    public Map<String, String> uploadPdf(@RequestParam("file") MultipartFile file) {
+        try {
+            String msg = documentService.processAndIngestPdf(file);
+            return Map.of("message", msg);
+        } catch (Exception e) {
+            return Map.of("error", "解析失败：" + e.getMessage());
+        }
+    }
+
+    // 接口2：下载 Excel 文件
+    @GetMapping("/download/{fileName}")
+    public org.springframework.http.ResponseEntity<org.springframework.core.io.Resource> downloadFile(@PathVariable String fileName) {
+        try {
+            Path path = Paths.get("downloads", fileName);
+            org.springframework.core.io.Resource resource = new org.springframework.core.io.UrlResource(path.toUri());
+            return org.springframework.http.ResponseEntity.ok()
+                    .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + resource.getFilename() + "\"")
+                    .body(resource);
+        } catch (Exception e) {
+            return org.springframework.http.ResponseEntity.notFound().build();
+        }
+    }
 
     @GetMapping("/chat")
     public String chat(
